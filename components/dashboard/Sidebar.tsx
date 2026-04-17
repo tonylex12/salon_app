@@ -1,18 +1,22 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
+  roles: ("ADMIN" | "STAFF" | "CLIENT")[];
 }
 
 const navItems: NavItem[] = [
   {
     label: "Resumen",
     href: "/dashboard",
+    roles: ["ADMIN", "STAFF"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -32,6 +36,27 @@ const navItems: NavItem[] = [
   {
     label: "Citas",
     href: "/dashboard/citas",
+    roles: ["ADMIN", "STAFF"],
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 7V3m8 4V3m-9 8h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: "Mis Citas",
+    href: "/dashboard/citas",
+    roles: ["CLIENT"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -51,6 +76,7 @@ const navItems: NavItem[] = [
   {
     label: "Clientes",
     href: "/dashboard/clientes",
+    roles: ["ADMIN"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -70,6 +96,7 @@ const navItems: NavItem[] = [
   {
     label: "Servicios",
     href: "/dashboard/servicios",
+    roles: ["ADMIN"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -89,6 +116,7 @@ const navItems: NavItem[] = [
   {
     label: "Personal",
     href: "/dashboard/personal",
+    roles: ["ADMIN"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -108,6 +136,7 @@ const navItems: NavItem[] = [
   {
     label: "Calendario",
     href: "/dashboard/calendario",
+    roles: ["ADMIN", "STAFF", "CLIENT"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -127,6 +156,7 @@ const navItems: NavItem[] = [
   {
     label: "Reportes",
     href: "/dashboard/reportes",
+    roles: ["ADMIN"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -146,6 +176,7 @@ const navItems: NavItem[] = [
   {
     label: "Configuración",
     href: "/dashboard/configuracion",
+    roles: ["ADMIN", "STAFF", "CLIENT"],
     icon: (
       <svg
         className="w-5 h-5"
@@ -171,7 +202,16 @@ const navItems: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const { data: session } = useSession();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Filtrar items según el rol del usuario
+  const userRole =
+    (session?.user?.role as "ADMIN" | "STAFF" | "CLIENT") || "CLIENT";
+  const filteredNavItems = navItems.filter((item) =>
+    item.roles.includes(userRole),
+  );
 
   return (
     <aside
@@ -235,18 +275,25 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-slate-300 hover:text-white hover:bg-slate-800"
-          >
-            {item.icon}
-            {sidebarOpen && (
-              <span className="text-sm font-medium">{item.label}</span>
-            )}
-          </Link>
-        ))}
+        {filteredNavItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                isActive
+                  ? "bg-primary text-white"
+                  : "text-slate-300 hover:text-white hover:bg-slate-800"
+              }`}
+            >
+              {item.icon}
+              {sidebarOpen && (
+                <span className="text-sm font-medium">{item.label}</span>
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Sidebar Footer */}

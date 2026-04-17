@@ -18,11 +18,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ControllerRenderProps, useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 export default function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const form = useForm({
     resolver: zodResolver(SignInSchema),
@@ -32,53 +32,74 @@ export default function LoginForm() {
     },
   });
 
+  // Mapear errores a mensajes explícitos
+  const getErrorMessage = (error: string) => {
+    const errorMap: Record<string, string> = {
+      CredentialsSignin:
+        "Email o contraseña incorrectos. Por favor verifica tus datos.",
+      InvalidEmail: "El email no es válido.",
+      UserNotFound: "No existe una cuenta con este email.",
+      PasswordIncorrect: "La contraseña es incorrecta.",
+      AccessDenied: "Acceso denegado. Por favor contacta con soporte.",
+      Callback: "Error en la autenticación. Por favor intenta de nuevo.",
+      OAuthSignin: "Error al conectar con el proveedor de OAuth.",
+      OAuthCallback: "Error en la autenticación OAuth.",
+      EmailSignInError: "No se pudo enviar el email de verificación.",
+      SessionCallback: "Error en la sesión. Por favor inicia sesión de nuevo.",
+      VerifyEmailError: "No se pudo verificar el email.",
+      Default: "Error al iniciar sesión. Por favor intenta de nuevo.",
+    };
+    return errorMap[error] || errorMap.Default;
+  };
+
   async function onSubmit(data: SignInType) {
-    console.log("📝 Form submitted with data:", data);
     setIsLoading(true);
-    setError(null);
 
     try {
-      console.log("🔐 Calling signIn with credentials...");
       const result = await signIn("credentials", {
         email: data.email,
         password: data.password,
         redirect: false,
       });
 
-      console.log("✅ Login result:", result);
-      console.log("📊 Result type:", typeof result);
-      console.log("📊 Result keys:", result ? Object.keys(result) : "null");
-
       // Verificar si fue exitoso
       if (!result) {
-        console.error("❌ No result returned");
-        setError("Error desconocido al iniciar sesión");
+        toast.error("Error desconocido", {
+          description:
+            "No se recibió respuesta del servidor. Por favor intenta de nuevo.",
+        });
         setIsLoading(false);
         return;
       }
 
       if (result.error) {
-        console.error("❌ Error from signIn:", result.error);
-        setError(result.error || "Error al iniciar sesión");
+        const errorMessage = getErrorMessage(result.error);
+        toast.error("Error al iniciar sesión", {
+          description: errorMessage,
+        });
         setIsLoading(false);
         return;
       }
 
       // Si ok es true o si no hay error, fue exitoso
       if (result.ok) {
-        console.log("✅ Login successful! Redirecting to dashboard...");
+        toast.success("¡Bienvenido!", {
+          description: "Iniciando sesión...",
+        });
         // Esperar un momento antes de redirigir
         await new Promise((resolve) => setTimeout(resolve, 500));
         router.push("/dashboard");
         return;
       }
 
-      console.warn("⚠️ Result OK is false:", result);
-      setError("Error al iniciar sesión");
+      toast.error("Error al iniciar sesión", {
+        description: "Por favor intenta de nuevo.",
+      });
       setIsLoading(false);
-    } catch (error) {
-      console.error("❌ Login error:", error);
-      setError("Error al iniciar sesión");
+    } catch {
+      toast.error("Error al iniciar sesión", {
+        description: "Hubo un error inesperado. Por favor intenta de nuevo.",
+      });
       setIsLoading(false);
     }
   }
@@ -93,12 +114,6 @@ export default function LoginForm() {
             </h1>
             <p className="text-slate-600">Inicia sesión en tu cuenta</p>
           </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
 
           <Form
             {...form}
@@ -158,7 +173,7 @@ export default function LoginForm() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 mt-6 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg transition-all duration-200"
+              className="w-full h-11 mt-6 bg-primary hover:bg-primary/80 text-white font-semibold rounded-lg transition-all duration-200"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">

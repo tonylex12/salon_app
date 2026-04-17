@@ -5,7 +5,6 @@ import { hash } from "bcryptjs";
 export async function POST(request: Request) {
   try {
     if (!prisma) {
-      console.error("[Register] Prisma client not available");
       return Response.json(
         { error: "Error del servidor: base de datos no disponible" },
         { status: 500 },
@@ -61,7 +60,6 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("Error en registro:", error);
     return Response.json(
       { error: "Error al registrar usuario" },
       { status: 500 },

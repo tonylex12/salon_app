@@ -23,9 +23,14 @@ declare module "next-auth" {
   }
 }
 
-const config = {
+export const config = {
   secret:
-    process.env.NEXTAUTH_SECRET || "fallback-secret-key-change-in-production",
+    process.env.NEXTAUTH_SECRET ||
+    (() => {
+      throw new Error(
+        "❌ NEXTAUTH_SECRET es requerido en producción. Configura la variable de entorno.",
+      );
+    })(),
   providers: [
     Credentials({
       credentials: {
@@ -34,50 +39,33 @@ const config = {
       },
       async authorize(credentials) {
         try {
-          console.log("[Auth] authorize() called with credentials:", {
-            email: credentials?.email,
-            hasPassword: !!credentials?.password,
-          });
-
           if (
             !credentials?.email ||
             !credentials?.password ||
             typeof credentials.email !== "string" ||
             typeof credentials.password !== "string"
           ) {
-            console.warn("[Auth] ❌ Missing or invalid credentials");
             return null;
           }
-
-          console.log("[Auth] ✅ Credentials validated, checking database...");
 
           // Dynamic import to avoid circular dependencies
           const { prisma } = await import("./prisma");
 
           if (!prisma) {
-            console.error(
-              "[Auth] ❌ Prisma client not available - cannot access database",
-            );
             return null;
           }
-
-          console.log("[Auth] 🔍 Looking up user:", credentials.email);
 
           const user = await prisma.user.findUnique({
             where: { email: credentials.email },
           });
 
           if (!user) {
-            console.warn("[Auth] ❌ User not found:", credentials.email);
             return null;
           }
 
           if (!user.password) {
-            console.warn("[Auth] ❌ User has no password hash");
             return null;
           }
-
-          console.log("[Auth] 🔐 Comparing passwords...");
 
           const isPasswordValid = await compare(
             credentials.password,
@@ -85,11 +73,8 @@ const config = {
           );
 
           if (!isPasswordValid) {
-            console.warn("[Auth] ❌ Password mismatch");
             return null;
           }
-
-          console.log("[Auth] ✅ Password valid! Returning user object");
 
           return {
             id: user.id,
@@ -99,7 +84,10 @@ const config = {
             image: user.avatarUrl,
           };
         } catch (error) {
-          console.error("[Auth] ❌ Authorization error:", error);
+          // Log errors only for debugging. Don't expose details in production
+          if (process.env.NODE_ENV === "development") {
+            console.error("[Auth] Authorization error:", error);
+          }
           return null;
         }
       },
@@ -126,14 +114,12 @@ const config = {
       };
     }) {
       if (user) {
-        console.log("[Auth JWT] ✅ User authenticated, updating token");
         token.id = user.id;
         token.role = user.role;
       }
       return token;
     },
     async session({ session, token }: { session: Session; token: JWT }) {
-      console.log("[Auth Session] 🔄 Session callback triggered");
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as "ADMIN" | "STAFF" | "CLIENT";

@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  Form,
   FormControl,
   FormField,
   FormItem,
@@ -15,14 +14,13 @@ import { SignUpSchema, type SignUp as SignUpType } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ControllerRenderProps, useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 export default function RegisterForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(SignUpSchema),
@@ -33,9 +31,29 @@ export default function RegisterForm() {
     },
   });
 
+  useEffect(() => {
+    // Setup effect if needed
+  }, [form]);
+
+  // Mapear errores de registro a mensajes explícitos
+  const getErrorMessage = (error: string) => {
+    const errorMap: Record<string, string> = {
+      already_exists: "Este email ya está registrado en el sistema.",
+      invalid_email: "El email no es válido.",
+      weak_password:
+        "La contraseña debe tener al menos 8 caracteres, incluir mayúsculas, números y caracteres especiales.",
+      registration_failed:
+        "No se pudo completar el registro. Por favor intenta de nuevo.",
+      server_error:
+        "Error en el servidor. Por favor intenta de nuevo más tarde.",
+    };
+    return (
+      errorMap[error] || "Error al registrarse. Por favor intenta de nuevo."
+    );
+  };
+
   async function onSubmit(data: SignUpType) {
     setIsLoading(true);
-    setError(null);
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -47,17 +65,28 @@ export default function RegisterForm() {
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result.error || "Error al registrarse");
+        const errorMessage = getErrorMessage(
+          result.error || "registration_failed",
+        );
+        toast.error("Error al registrarse", {
+          description: errorMessage,
+        });
         setIsLoading(false);
         return;
       }
 
-      setSuccess(true);
+      toast.success("¡Bienvenido!", {
+        description: "Tu cuenta ha sido creada exitosamente. Redirigiendo...",
+      });
+
       setTimeout(() => {
         router.push("/login");
       }, 2000);
-    } catch {
-      setError("Error al registrarse");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al registrarse", {
+        description: "Hubo un error inesperado. Por favor intenta de nuevo.",
+      });
       setIsLoading(false);
     }
   }
@@ -73,21 +102,17 @@ export default function RegisterForm() {
             <p className="text-slate-600">Úntete y comienza a reservar</p>
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">
-              ✓ Registro exitoso. Redirigiendo...
-            </div>
-          )}
-
-          <Form
-            {...form}
-            onSubmit={form.handleSubmit(onSubmit)}
+          <form
+            onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              // Mostrar errores de validación con toast
+              Object.entries(errors).forEach(([field, error]) => {
+                if (error?.message) {
+                  toast.error(`Error en ${field}`, {
+                    description: error.message as string,
+                  });
+                }
+              });
+            })}
             className="space-y-4"
           >
             <FormField
@@ -113,7 +138,6 @@ export default function RegisterForm() {
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="email"
@@ -138,7 +162,6 @@ export default function RegisterForm() {
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="password"
@@ -153,7 +176,7 @@ export default function RegisterForm() {
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Mín. 8 caracteres, mayúscula, número, carácter especial"
                       type="password"
                       {...field}
                       className="border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
@@ -163,11 +186,10 @@ export default function RegisterForm() {
                 </FormItem>
               )}
             />
-
             <Button
               type="submit"
-              disabled={isLoading || success}
-              className="w-full h-11 mt-6 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50"
+              disabled={isLoading}
+              className="w-full h-11 mt-6 bg-primary hover:bg-primary/80 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -178,7 +200,7 @@ export default function RegisterForm() {
                 "Crear Cuenta"
               )}
             </Button>
-          </Form>
+          </form>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">

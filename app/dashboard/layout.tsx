@@ -11,6 +11,17 @@ export default function DashboardLayout({
 }) {
   const { data: session } = useSession();
 
+  const getWelcomeMessage = () => {
+    const role = session?.user?.role;
+    if (role === "ADMIN") {
+      return "Gestiona tu negocio de forma eficiente";
+    } else if (role === "STAFF") {
+      return "Gestiona tus citas y horarios";
+    } else {
+      return "Consulta y reserva tus citas";
+    }
+  };
+
   return (
     <div className="flex h-screen bg-slate-100">
       <Sidebar />
@@ -23,7 +34,7 @@ export default function DashboardLayout({
               Bienvenido, {session?.user?.name}
             </h2>
             <p className="text-sm text-slate-600 mt-0.5">
-              Gestiona tu negocio de forma eficiente
+              {getWelcomeMessage()}
             </p>
           </div>
           <div className="flex items-center gap-6">

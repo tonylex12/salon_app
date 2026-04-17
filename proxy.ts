@@ -18,14 +18,11 @@ const DASHBOARD_ROUTES = ["/dashboard"];
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  console.log(`[Proxy] 🔍 Checking route: ${pathname}`);
-
   // Si es una ruta pública, permitir acceso
   const isPublicRoute = PUBLIC_ROUTES.some((route) =>
     pathname.startsWith(route),
   );
   if (isPublicRoute) {
-    console.log(`[Proxy] ✅ Public route allowed`);
     return NextResponse.next();
   }
 
@@ -34,29 +31,20 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith(route),
   );
   if (isDashboardRoute) {
-    console.log(`[Proxy] 🔐 Dashboard route, checking token...`);
-
     const token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
     });
 
-    console.log(`[Proxy] Token present: ${!!token}`);
-    console.log(`[Proxy] Token role: ${token?.role}`);
-
     if (!token) {
-      console.log(`[Proxy] ❌ No token, redirecting to login`);
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
     // Verificar permisos por rol
     const userRole = token.role as string;
-    if (!["ADMIN", "STAFF"].includes(userRole || "")) {
-      console.log(`[Proxy] ❌ Invalid role, redirecting to /`);
+    if (!userRole || !["ADMIN", "STAFF"].includes(userRole)) {
       return NextResponse.redirect(new URL("/", request.url));
     }
-
-    console.log(`[Proxy] ✅ Token valid, allowing access`);
   }
 
   return NextResponse.next();
