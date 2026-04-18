@@ -93,10 +93,11 @@ export function ScheduleCalendar({
         try {
           // For clients, fetch all appointments to see conflicts
           // For staff/admin, fetch their appointments
+          // Include past appointments to show them in the calendar
           const url =
             normalizedUserRole === "CLIENT"
-              ? "/api/appointments?showAll=true"
-              : "/api/appointments";
+              ? "/api/appointments?showAll=true&includePast=true"
+              : "/api/appointments?includePast=true";
 
           const appointmentsRes = await fetch(url);
           if (appointmentsRes.ok) {
@@ -108,15 +109,8 @@ export function ScheduleCalendar({
             bookedSlots = appointments
               .filter((apt: AppointmentDetail) => {
                 if (staffId && apt.staffId !== staffId) return false;
-                // Convert UTC to local timezone to get the local date
-                const dateObj = new Date(apt.date);
-                const year = dateObj.getFullYear();
-                const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-                const day = String(dateObj.getDate()).padStart(2, "0");
-                const aptDateOnly = new Date(
-                  `${year}-${month}-${day}T00:00:00`,
-                );
-                return aptDateOnly >= today; // Only future appointments
+                // Show all appointments (pasadas, actuales y futuras)
+                return true;
               })
               .map((apt: AppointmentDetail) => {
                 // Parse the ISO string to convert UTC to local timezone

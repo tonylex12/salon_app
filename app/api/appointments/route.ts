@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
     const userRole = session.user.role as "ADMIN" | "STAFF" | "CLIENT";
     const userId = session.user.id;
     const showAll = request.nextUrl.searchParams.get("showAll") === "true";
+    const includePast =
+      request.nextUrl.searchParams.get("includePast") === "true";
 
     // Construir filtro según el rol
     let whereClause: Record<string, unknown> = {};
@@ -28,18 +30,25 @@ export async function GET(request: NextRequest) {
     if (userRole === "CLIENT") {
       // Los clientes ven solo sus citas por defecto
       // pero pueden ver todas si showAll=true (para el calendario)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
       if (showAll) {
-        // Mostrar todas las citas para evitar conflictos en el calendario
-        whereClause = {
-          date: {
-            gte: today,
-          },
-        };
+        // Mostrar todas las citas (incluyendo pasadas si es solicitado)
+        if (includePast) {
+          // Ver todas las citas (sin filtro de fecha)
+          whereClause = {};
+        } else {
+          // Ver solo citas futuras
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          whereClause = {
+            date: {
+              gte: today,
+            },
+          };
+        }
       } else {
-        // Mostrar solo las citas del cliente
+        // Mostrar solo las citas del cliente (futuras por defecto)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         whereClause = {
           clientId: userId,
           date: {
@@ -48,25 +57,35 @@ export async function GET(request: NextRequest) {
         };
       }
     } else if (userRole === "STAFF") {
-      // El staff ve todas las citas del día
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      whereClause = {
-        date: {
-          gte: today,
-        },
-      };
+      // El staff ve todas las citas
+      if (includePast) {
+        // Ver todas las citas (incluyendo pasadas)
+        whereClause = {};
+      } else {
+        // Ver solo citas futuras
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        whereClause = {
+          date: {
+            gte: today,
+          },
+        };
+      }
     } else {
-      // ADMIN ve todas las citas del día
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      whereClause = {
-        date: {
-          gte: today,
-        },
-      };
+      // ADMIN ve todas las citas
+      if (includePast) {
+        // Ver todas las citas (incluyendo pasadas)
+        whereClause = {};
+      } else {
+        // Ver solo citas futuras
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        whereClause = {
+          date: {
+            gte: today,
+          },
+        };
+      }
     }
 
     // Obtener citas
