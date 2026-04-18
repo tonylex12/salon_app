@@ -2,6 +2,7 @@
 
 import { StaffCreateModal } from "@/components/dashboard/StaffCreateModal";
 import { StaffDeleteModal } from "@/components/dashboard/StaffDeleteModal";
+import { StaffEditPhoneModal } from "@/components/dashboard/StaffEditPhoneModal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSession } from "next-auth/react";
@@ -37,6 +38,7 @@ export default function PersonalPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [deletingStaff, setDeletingStaff] = useState<StaffMember | null>(null);
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Auth check
@@ -84,6 +86,7 @@ export default function PersonalPage() {
       if (res.ok) {
         const data = await res.json();
         setStaff(data.staff || []);
+        setEditingStaff(null);
       }
     } catch (error) {
       console.error("Error refreshing staff:", error);
@@ -231,6 +234,13 @@ export default function PersonalPage() {
                     <div className="ml-4 flex gap-2">
                       <Button
                         size="sm"
+                        variant="outline"
+                        onClick={() => setEditingStaff(member)}
+                      >
+                        Editar Teléfono
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="destructive"
                         onClick={() => setDeletingStaff(member)}
                       >
@@ -271,6 +281,13 @@ export default function PersonalPage() {
         staff={deletingStaff}
         onClose={() => setDeletingStaff(null)}
         onStaffDeleted={handleRefreshStaff}
+      />
+
+      <StaffEditPhoneModal
+        staff={editingStaff}
+        isOpen={!!editingStaff}
+        onClose={() => setEditingStaff(null)}
+        onSuccess={handleRefreshStaff}
       />
     </div>
   );

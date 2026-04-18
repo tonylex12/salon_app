@@ -25,7 +25,15 @@ export async function GET(request: NextRequest) {
 
     const period = request.nextUrl.searchParams.get("period") || "month"; // day, week, month
     const dateParam = request.nextUrl.searchParams.get("date");
-    const baseDate = dateParam ? new Date(dateParam) : new Date();
+
+    // Parse date correctly to avoid timezone issues
+    let baseDate: Date;
+    if (dateParam) {
+      const [year, month, day] = dateParam.split("-").map(Number);
+      baseDate = new Date(year, month - 1, day);
+    } else {
+      baseDate = new Date();
+    }
 
     // Calculate date range based on period
     const startDate = new Date(baseDate);
@@ -90,13 +98,15 @@ export async function GET(request: NextRequest) {
 
     // Calculate metrics
     const totalAppointments = appointments.length;
-    const totalRevenue = appointments.reduce(
+    // Only count revenue from completed appointments
+    const completedAppointments = appointments.filter(
+      (apt) => apt.status === "COMPLETED",
+    );
+    const totalRevenue = completedAppointments.reduce(
       (sum, apt) => sum + apt.service.price / 100,
       0,
     );
-    const completedCount = appointments.filter(
-      (apt) => apt.status === "COMPLETED",
-    ).length;
+    const completedCount = completedAppointments.length;
 
     // Group by staff
     const staffStats: Record<
@@ -118,7 +128,10 @@ export async function GET(request: NextRequest) {
         };
       }
       staffStats[staffId].appointments++;
-      staffStats[staffId].revenue += apt.service.price / 100;
+      // Only add revenue from completed appointments
+      if (apt.status === "COMPLETED") {
+        staffStats[staffId].revenue += apt.service.price / 100;
+      }
     });
 
     // Group by service
@@ -141,7 +154,10 @@ export async function GET(request: NextRequest) {
         };
       }
       serviceStats[serviceId].count++;
-      serviceStats[serviceId].revenue += apt.service.price / 100;
+      // Only add revenue from completed appointments
+      if (apt.status === "COMPLETED") {
+        serviceStats[serviceId].revenue += apt.service.price / 100;
+      }
     });
 
     // Group by day
@@ -168,7 +184,10 @@ export async function GET(request: NextRequest) {
         };
       }
       dailyStats[dateStr].appointments++;
-      dailyStats[dateStr].revenue += apt.service.price / 100;
+      // Only add revenue from completed appointments
+      if (apt.status === "COMPLETED") {
+        dailyStats[dateStr].revenue += apt.service.price / 100;
+      }
     });
 
     return NextResponse.json({
@@ -178,10 +197,11 @@ export async function GET(request: NextRequest) {
       endDate: endDate.toISOString(),
       summary: {
         totalAppointments,
-        totalRevenue,
+        totalRevenue: Number(totalRevenue.toFixed(2)),
         completedCount,
-        averageRevenue:
-          totalAppointments > 0 ? totalRevenue / totalAppointments : 0,
+        averageRevenue: Number(
+          (completedCount > 0 ? totalRevenue / completedCount : 0).toFixed(2),
+        ),
       },
       staffStats: Object.values(staffStats)
         .map((stat) => ({

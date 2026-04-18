@@ -3,6 +3,90 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { NextRequest, NextResponse } from "next/server";
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const session = await getServerSession(config);
+
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only ADMIN can update staff
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (!prisma) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+    const { phone } = body;
+
+    // Validate phone
+    if (!phone || typeof phone !== "string" || phone.trim() === "") {
+      return NextResponse.json(
+        { error: "Phone number is required" },
+        { status: 400 },
+      );
+    }
+
+    // Get staff to find userId
+    const staff = await prisma.staff.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!staff) {
+      return NextResponse.json(
+        { error: "Staff member not found" },
+        { status: 404 },
+      );
+    }
+
+    // Update user phone
+    await prisma.user.update({
+      where: { id: staff.userId },
+      data: { phone: phone.trim() },
+    });
+
+    // Get updated staff with user info
+    const updatedStaff = await prisma.staff.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        userId: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Phone updated successfully",
+      staff: updatedStaff,
+    });
+  } catch (error) {
+    console.error("[Staff API] PUT Error:", error);
+    return NextResponse.json(
+      { error: "Failed to update staff member" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
