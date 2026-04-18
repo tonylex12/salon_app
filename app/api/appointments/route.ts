@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(config);
 
@@ -20,18 +20,33 @@ export async function GET() {
 
     const userRole = session.user.role as "ADMIN" | "STAFF" | "CLIENT";
     const userId = session.user.id;
+    const showAll = request.nextUrl.searchParams.get("showAll") === "true";
 
     // Construir filtro según el rol
     let whereClause: Record<string, unknown> = {};
 
     if (userRole === "CLIENT") {
-      // Los clientes solo ven sus propias citas
-      whereClause = {
-        clientId: userId,
-        date: {
-          gte: new Date(), // No mostrar citas pasadas
-        },
-      };
+      // Los clientes ven solo sus citas por defecto
+      // pero pueden ver todas si showAll=true (para el calendario)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (showAll) {
+        // Mostrar todas las citas para evitar conflictos en el calendario
+        whereClause = {
+          date: {
+            gte: today,
+          },
+        };
+      } else {
+        // Mostrar solo las citas del cliente
+        whereClause = {
+          clientId: userId,
+          date: {
+            gte: today,
+          },
+        };
+      }
     } else if (userRole === "STAFF") {
       // El staff ve todas las citas del día
       const today = new Date();
@@ -90,7 +105,7 @@ export async function GET() {
       },
     });
 
-    // Mapear a formato más legible
+    // Mapear a formato más legible con control de acceso
     const formattedAppointments = appointments.map((apt) => {
       // Extract date in local timezone, not UTC
       const year = apt.date.getFullYear();
@@ -98,13 +113,39 @@ export async function GET() {
       const day = String(apt.date.getDate()).padStart(2, "0");
       const dateString = `${year}-${month}-${day}`;
 
+      // Check if this appointment belongs to the current user
+      const isOwnAppointment = userRole === "CLIENT" && apt.clientId === userId;
+
+      // For CLIENT users viewing all appointments (calendar mode),
+      // restrict data exposure for appointments that don't belong to them
+      if (userRole === "CLIENT" && showAll && !isOwnAppointment) {
+        // Return minimal data for other users' appointments
+        return {
+          id: apt.id,
+          staffId: apt.staffId,
+          clientId: apt.clientId,
+          serviceId: apt.serviceId,
+          date: apt.date.toISOString(),
+          time: apt.date.toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          status: apt.status,
+          // Don't expose: clientName, clientPhone, serviceName, staffName, price, notes, duration
+        };
+      }
+
+      // For own appointments or ADMIN/STAFF, return full data
       return {
         id: apt.id,
+        staffId: apt.staffId,
+        clientId: apt.clientId,
+        serviceId: apt.serviceId,
         serviceName: apt.service.name,
         staffName: apt.staff.user.name,
         clientName: apt.client.name,
         clientPhone: apt.client.phone,
-        date: apt.date.toISOString(), // Send full ISO datetime to preserve timezone
+        date: apt.date.toISOString(),
         time: apt.date.toLocaleTimeString("es-ES", {
           hour: "2-digit",
           minute: "2-digit",
@@ -234,6 +275,125 @@ export async function POST(request: NextRequest) {
     console.error("[Appointments POST API] Error:", error);
     return NextResponse.json(
       { error: "Failed to create appointment" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await getServerSession(config);
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only ADMIN and STAFF can update appointments
+    if (session.user.role !== "ADMIN" && session.user.role !== "STAFF") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { appointmentId, status } = body;
+
+    if (!appointmentId || !status) {
+      return NextResponse.json(
+        { error: "Missing required fields: appointmentId, status" },
+        { status: 400 },
+      );
+    }
+
+    // Validate status
+    const validStatuses = ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
+    if (!prisma) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    // Update appointment status
+    const appointment = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { status },
+      include: {
+        client: {
+          select: { name: true, email: true, phone: true },
+        },
+        staff: {
+          select: {
+            user: {
+              select: { name: true },
+            },
+          },
+        },
+        service: {
+          select: { name: true },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      message: "Appointment updated successfully",
+      appointment,
+      success: true,
+    });
+  } catch (error) {
+    console.error("[Appointments PUT API] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to update appointment" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(config);
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only ADMIN and STAFF can delete appointments
+    if (session.user.role !== "ADMIN" && session.user.role !== "STAFF") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { appointmentId } = body;
+
+    if (!appointmentId) {
+      return NextResponse.json(
+        { error: "Missing required field: appointmentId" },
+        { status: 400 },
+      );
+    }
+
+    if (!prisma) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    // Delete appointment
+    await prisma.appointment.delete({
+      where: { id: appointmentId },
+    });
+
+    return NextResponse.json({
+      message: "Appointment deleted successfully",
+      success: true,
+    });
+  } catch (error) {
+    console.error("[Appointments DELETE API] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete appointment" },
       { status: 500 },
     );
   }

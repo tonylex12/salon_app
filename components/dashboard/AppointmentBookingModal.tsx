@@ -74,12 +74,16 @@ interface AppointmentBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  onAppointmentBooked?: () => void;
+  preSelectedDateTime?: { date: string; time: string } | null;
 }
 
 export function AppointmentBookingModal({
   isOpen,
   onClose,
   onSuccess,
+  onAppointmentBooked,
+  preSelectedDateTime,
 }: AppointmentBookingModalProps) {
   const { data: session } = useSession();
   const [services, setServices] = useState<Service[]>([]);
@@ -106,6 +110,14 @@ export function AppointmentBookingModal({
       form.setValue("clientId", session.user.id);
     }
   }, [session, form]);
+
+  // Set pre-selected date and time
+  useEffect(() => {
+    if (preSelectedDateTime && isOpen) {
+      form.setValue("date", preSelectedDateTime.date);
+      form.setValue("time", preSelectedDateTime.time);
+    }
+  }, [preSelectedDateTime, isOpen, form]);
 
   // Fetch services
   useEffect(() => {
@@ -225,6 +237,7 @@ export function AppointmentBookingModal({
       setSelectedService(null);
       onClose();
       onSuccess?.();
+      onAppointmentBooked?.();
     } catch (error) {
       console.error("Error creating appointment:", error);
       toast.error("Error inesperado al agendar la cita");

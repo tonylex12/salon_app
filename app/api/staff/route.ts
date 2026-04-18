@@ -8,15 +8,6 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(config);
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Only ADMIN can access staff list
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     if (!prisma) {
       return NextResponse.json(
         { error: "Database connection failed" },
@@ -24,7 +15,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all staff members
+    // Check if user is admin for detailed information
+    const isAdmin = session?.user?.role === "ADMIN";
+
+    // Get all staff members - public endpoint for all authenticated users
     const staff = await prisma.staff.findMany({
       include: {
         user: {
@@ -45,12 +39,14 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        _count: {
-          select: {
-            appointments: true,
-            schedule: true,
-          },
-        },
+        _count: isAdmin
+          ? {
+              select: {
+                appointments: true,
+                schedule: true,
+              },
+            }
+          : undefined,
       },
       orderBy: {
         createdAt: "desc",
@@ -67,9 +63,11 @@ export async function GET(request: NextRequest) {
       bio: s.bio,
       avatarUrl: s.avatarUrl,
       servicesCount: s.services.length,
-      appointmentsCount: s._count.appointments,
-      scheduleCount: s._count.schedule,
-      createdAt: s.createdAt.toISOString(),
+      ...(isAdmin && {
+        appointmentsCount: s._count?.appointments || 0,
+        scheduleCount: s._count?.schedule || 0,
+        createdAt: s.createdAt.toISOString(),
+      }),
     }));
 
     return NextResponse.json({

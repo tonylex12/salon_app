@@ -20,8 +20,10 @@ interface Appointment {
 
 interface AppointmentCardProps {
   appointment: Appointment;
+  userRole?: "ADMIN" | "STAFF" | "CLIENT";
   onReschedule?: (appointment: Appointment) => void;
   onCancel?: (appointment: Appointment) => void;
+  onStatusChange?: (appointmentId: string, newStatus: string) => void;
 }
 
 const statusTranslations: Record<string, { label: string; color: string }> = {
@@ -45,8 +47,10 @@ const statusTranslations: Record<string, { label: string; color: string }> = {
 
 export function AppointmentCard({
   appointment,
+  userRole,
   onReschedule,
   onCancel,
+  onStatusChange,
 }: AppointmentCardProps) {
   const getStatusStyle = (status: string) => {
     return statusTranslations[status] || statusTranslations.PENDING;
@@ -157,8 +161,45 @@ export function AppointmentCard({
         </div>
 
         {/* Actions */}
-        {appointment.status === "PENDING" ||
-        appointment.status === "CONFIRMED" ? (
+        {userRole === "ADMIN" || userRole === "STAFF" ? (
+          // Admin/Staff actions: Change status or delete (only if not completed)
+          appointment.status !== "COMPLETED" &&
+          appointment.status !== "CANCELLED" ? (
+            <div className="mt-4 pt-4 border-t border-slate-200 flex gap-2">
+              <div className="flex gap-2 flex-1">
+                {appointment.status !== "CONFIRMED" && (
+                  <Button
+                    className="flex-1 bg-primary hover:bg-primary/90"
+                    onClick={() =>
+                      onStatusChange?.(appointment.id, "CONFIRMED")
+                    }
+                  >
+                    Confirmar
+                  </Button>
+                )}
+                {appointment.status === "CONFIRMED" && (
+                  <Button
+                    className="flex-1 bg-emerald-400 hover:bg-emerald-500"
+                    onClick={() =>
+                      onStatusChange?.(appointment.id, "COMPLETED")
+                    }
+                  >
+                    Marcar como Completada
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => onCancel?.(appointment)}
+              >
+                Eliminar Cita
+              </Button>
+            </div>
+          ) : null
+        ) : appointment.status === "PENDING" ||
+          appointment.status === "CONFIRMED" ? (
+          // Client actions: Reschedule or cancel
           <div className="mt-4 pt-4 border-t border-slate-200 flex gap-3">
             <Button
               className="flex-1"
