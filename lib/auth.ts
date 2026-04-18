@@ -10,6 +10,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       name: string;
+      phone?: string;
       role: "ADMIN" | "STAFF" | "CLIENT";
       image?: string | null;
     };
@@ -19,6 +20,7 @@ declare module "next-auth" {
     id: string;
     email: string;
     name: string;
+    phone?: string;
     role: "ADMIN" | "STAFF" | "CLIENT";
   }
 }
@@ -80,6 +82,7 @@ export const config = {
             id: user.id,
             email: user.email,
             name: user.name || "",
+            phone: user.phone || undefined,
             role: user.role as "ADMIN" | "STAFF" | "CLIENT",
             image: user.avatarUrl,
           };
@@ -110,12 +113,14 @@ export const config = {
         id: string;
         email: string;
         name: string;
+        phone?: string;
         role: "ADMIN" | "STAFF" | "CLIENT";
       };
     }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.phone = user.phone;
       }
       return token;
     },
@@ -123,6 +128,7 @@ export const config = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as "ADMIN" | "STAFF" | "CLIENT";
+        session.user.phone = token.phone as string | undefined;
       }
       return session;
     },
