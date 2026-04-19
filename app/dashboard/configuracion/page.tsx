@@ -31,7 +31,7 @@ export default function ConfiguracionPage() {
 
   // Redirect if not authenticated
   if (!session) {
-    router.push("/auth/login");
+    router.push("/login");
     return null;
   }
 

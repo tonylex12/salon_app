@@ -30,7 +30,7 @@ function VerifyEmailContent() {
             toast.success("¡Email verificado exitosamente!");
             // Redirigir a login después de 2 segundos
             setTimeout(() => {
-              router.push("/auth/login");
+              router.push("/login");
             }, 2000);
           } else {
             const data = await response.json();
@@ -115,7 +115,7 @@ function VerifyEmailContent() {
               </Button>
 
               <Button
-                onClick={() => router.push("/auth/login")}
+                onClick={() => router.push("/login")}
                 variant="ghost"
                 className="w-full"
               >
@@ -205,7 +205,7 @@ function VerifyEmailContent() {
               </Button>
 
               <Button
-                onClick={() => router.push("/auth/login")}
+                onClick={() => router.push("/login")}
                 variant="ghost"
                 className="w-full"
               >

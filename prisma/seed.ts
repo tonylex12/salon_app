@@ -40,6 +40,7 @@ async function main() {
       phone: "+34 600 123 456",
       role: "ADMIN",
       avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=admin",
+      emailVerified: new Date(),
     },
   });
   console.log("✅ Usuario ADMIN creado:", adminUser.email);
@@ -54,6 +55,7 @@ async function main() {
       phone: "+34 600 234 567",
       role: "STAFF",
       avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=laura",
+      emailVerified: new Date(),
     },
   });
   console.log("✅ Usuario STAFF creado:", staffUser.email);
@@ -68,6 +70,7 @@ async function main() {
       phone: "+34 600 345 678",
       role: "CLIENT",
       avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=maria",
+      emailVerified: new Date(),
     },
   });
   console.log("✅ Usuario CLIENT creado:", clientUser.email);

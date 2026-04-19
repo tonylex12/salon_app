@@ -430,11 +430,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only ADMIN and STAFF can delete appointments
-    if (session.user.role !== "ADMIN" && session.user.role !== "STAFF") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await request.json();
     const { appointmentId } = body;
 
@@ -457,7 +452,7 @@ export async function DELETE(request: NextRequest) {
       where: { id: appointmentId },
       include: {
         client: {
-          select: { name: true, email: true },
+          select: { id: true, name: true, email: true },
         },
         service: {
           select: { name: true },
@@ -470,6 +465,20 @@ export async function DELETE(request: NextRequest) {
         { error: "Appointment not found" },
         { status: 404 },
       );
+    }
+
+    // Authorization check:
+    // - ADMIN and STAFF can delete any appointment
+    // - CLIENT can only delete their own appointments
+    const userRole = session.user.role as string;
+    const userId = session.user.id;
+
+    if (
+      userRole !== "ADMIN" &&
+      userRole !== "STAFF" &&
+      (userRole !== "CLIENT" || appointmentToDelete.clientId !== userId)
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Delete appointment

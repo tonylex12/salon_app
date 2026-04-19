@@ -78,7 +78,7 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
 
 // Template: Email de verificación de email
 const emailVerificationTemplate = (data: EmailVerificationData) => {
-  const verificationLink = `${process.env.APP_URL}/auth/verify-email?token=${data.token}`;
+  const verificationLink = `${process.env.APP_URL}/verify-email?token=${data.token}`;
   const expirationTime = "24 horas";
 
   return `

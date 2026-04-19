@@ -5,6 +5,14 @@ import { AppointmentCard } from "@/components/dashboard/AppointmentCard";
 import { AppointmentSearch } from "@/components/dashboard/AppointmentSearch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AppointmentSkeletonLoader } from "@/components/ui/skeleton";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -34,6 +42,10 @@ export default function CitasPage() {
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [appointmentToCancel, setAppointmentToCancel] =
+    useState<Appointment | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -121,32 +133,46 @@ export default function CitasPage() {
     }
   };
 
-  const handleDeleteAppointment = async (appointment: Appointment) => {
-    if (
-      !confirm(
-        `¿Estás seguro de que deseas eliminar completamente la cita de ${appointment.clientName}?`,
-      )
-    ) {
-      return;
-    }
+  const handleDeleteAppointment = (appointment: Appointment) => {
+    setAppointmentToCancel(appointment);
+    setCancelDialogOpen(true);
+  };
+
+  const confirmCancelAppointment = async () => {
+    if (!appointmentToCancel) return;
+
+    setIsCancelling(true);
 
     try {
       const res = await fetch("/api/appointments", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: appointment.id }),
+        body: JSON.stringify({ appointmentId: appointmentToCancel.id }),
       });
 
       if (res.ok) {
-        toast.success("Cita eliminada exitosamente");
+        toast.success("Cita cancelada exitosamente");
         handleRefreshAppointments();
+        setCancelDialogOpen(false);
+        setAppointmentToCancel(null);
       } else {
-        toast.error("Error al eliminar la cita");
+        const error = await res.json();
+        toast.error(error.error || "Error al cancelar la cita");
       }
     } catch (error) {
-      console.error("Error deleting appointment:", error);
-      toast.error("Error al eliminar la cita");
+      console.error("Error cancelling appointment:", error);
+      toast.error("Error al cancelar la cita");
+    } finally {
+      setIsCancelling(false);
     }
+  };
+
+  const handleReschedule = (appointment: Appointment) => {
+    // Abre el modal para que el usuario pueda agendar una nueva cita
+    setIsModalOpen(true);
+    toast.info(
+      "Agenda una nueva cita. Después podrás cancelar la anterior si lo deseas.",
+    );
   };
 
   if (status === "loading") {
@@ -284,6 +310,7 @@ export default function CitasPage() {
                 key={apt.id}
                 appointment={apt}
                 userRole={session?.user?.role as "ADMIN" | "STAFF" | "CLIENT"}
+                onReschedule={handleReschedule}
                 onStatusChange={handleStatusChange}
                 onCancel={handleDeleteAppointment}
               />
@@ -291,6 +318,38 @@ export default function CitasPage() {
           )}
         </div>
       </div>
+
+      {/* Cancel Appointment Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar Cita</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas cancelar esta cita?{" "}
+              {appointmentToCancel && `de ${appointmentToCancel.clientName}`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelDialogOpen(false);
+                setAppointmentToCancel(null);
+              }}
+              disabled={isCancelling}
+            >
+              No, mantener cita
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmCancelAppointment}
+              disabled={isCancelling}
+            >
+              {isCancelling ? "Cancelando..." : "Sí, cancelar cita"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Appointment Booking Modal */}
       <AppointmentBookingModal
