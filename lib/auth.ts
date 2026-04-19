@@ -65,6 +65,11 @@ export const config = {
             return null;
           }
 
+          // Verificar que el email esté validado
+          if (!user.emailVerified) {
+            throw new Error("EMAIL_NOT_VERIFIED");
+          }
+
           if (!user.password) {
             return null;
           }

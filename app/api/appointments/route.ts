@@ -1,4 +1,8 @@
 import { config } from "@/lib/auth";
+import {
+  sendAppointmentConfirmation,
+  sendCancellationEmail,
+} from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { NextRequest, NextResponse } from "next/server";
@@ -217,6 +221,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!prisma) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
     // CLIENT users can only create appointments for themselves
     if (session.user.role === "CLIENT" && session.user.id !== clientId) {
       return NextResponse.json(
@@ -281,6 +292,30 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    // Enviar email de confirmación
+    const appointmentDate = new Date(date);
+    const dateFormatted = appointmentDate.toLocaleDateString("es-ES", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const timeFormatted = appointmentDate.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    await sendAppointmentConfirmation({
+      clientEmail: appointment.client.email,
+      clientName: appointment.client.name,
+      staffName: appointment.staff.user.name,
+      serviceName: appointment.service.name,
+      date: dateFormatted,
+      time: timeFormatted,
+      duration: appointment.service.duration,
+      appointmentId: appointment.id,
     });
 
     return NextResponse.json(
@@ -356,6 +391,23 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    // Enviar email de cancelación si el estado cambia a CANCELLED
+    if (status === "CANCELLED") {
+      const appointmentDate = appointment.date.toLocaleDateString("es-ES", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      await sendCancellationEmail(
+        appointment.client.email,
+        appointment.client.name,
+        appointment.service.name,
+        appointmentDate,
+      );
+    }
+
     return NextResponse.json({
       message: "Appointment updated successfully",
       appointment,
@@ -400,10 +452,48 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Get appointment details before deleting
+    const appointmentToDelete = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      include: {
+        client: {
+          select: { name: true, email: true },
+        },
+        service: {
+          select: { name: true },
+        },
+      },
+    });
+
+    if (!appointmentToDelete) {
+      return NextResponse.json(
+        { error: "Appointment not found" },
+        { status: 404 },
+      );
+    }
+
     // Delete appointment
     await prisma.appointment.delete({
       where: { id: appointmentId },
     });
+
+    // Enviar email de cancelación
+    const appointmentDate = appointmentToDelete.date.toLocaleDateString(
+      "es-ES",
+      {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      },
+    );
+
+    await sendCancellationEmail(
+      appointmentToDelete.client.email,
+      appointmentToDelete.client.name,
+      appointmentToDelete.service.name,
+      appointmentDate,
+    );
 
     return NextResponse.json({
       message: "Appointment deleted successfully",

@@ -42,6 +42,8 @@ export default function LoginForm() {
       PasswordIncorrect: "La contraseña es incorrecta.",
       AccessDenied: "Acceso denegado. Por favor contacta con soporte.",
       Callback: "Error en la autenticación. Por favor intenta de nuevo.",
+      EMAIL_NOT_VERIFIED:
+        "Tu email no ha sido verificado. Por favor revisa tu bandeja de entrada.",
       OAuthSignin: "Error al conectar con el proveedor de OAuth.",
       OAuthCallback: "Error en la autenticación OAuth.",
       EmailSignInError: "No se pudo enviar el email de verificación.",
@@ -74,6 +76,44 @@ export default function LoginForm() {
 
       if (result.error) {
         const errorMessage = getErrorMessage(result.error);
+
+        // Manejo especial para EMAIL_NOT_VERIFIED
+        if (result.error === "EMAIL_NOT_VERIFIED") {
+          toast.error("Email no verificado", {
+            description: errorMessage,
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // Verificar si el error es por email no verificado
+        if (
+          result.error === "CredentialsSignin" ||
+          result.error === "Callback"
+        ) {
+          try {
+            const checkRes = await fetch("/api/auth/check-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: data.email }),
+            });
+
+            if (checkRes.ok) {
+              const checkData = await checkRes.json();
+              if (checkData.exists && !checkData.emailVerified) {
+                toast.error("Email no verificado", {
+                  description:
+                    "Tu email no ha sido verificado. Por favor revisa tu bandeja de entrada.",
+                });
+                setIsLoading(false);
+                return;
+              }
+            }
+          } catch (error) {
+            console.error("Error checking email:", error);
+          }
+        }
+
         toast.error("Error al iniciar sesión", {
           description: errorMessage,
         });
