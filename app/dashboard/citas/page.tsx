@@ -158,10 +158,14 @@ export default function CitasPage() {
       } else {
         const error = await res.json();
         toast.error(error.error || "Error al cancelar la cita");
+        setCancelDialogOpen(false);
+        setAppointmentToCancel(null);
       }
     } catch (error) {
       console.error("Error cancelling appointment:", error);
       toast.error("Error al cancelar la cita");
+      setCancelDialogOpen(false);
+      setAppointmentToCancel(null);
     } finally {
       setIsCancelling(false);
     }

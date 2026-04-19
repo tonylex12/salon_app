@@ -61,15 +61,29 @@ export async function GET(request: NextRequest) {
         };
       }
     } else if (userRole === "STAFF") {
-      // El staff ve todas las citas
+      // El staff solo ve sus propias citas (donde es el staff asignado)
+      const staffProfile = await prisma.staff.findUnique({
+        where: { userId },
+      });
+
+      if (!staffProfile) {
+        return NextResponse.json(
+          { error: "Staff profile not found" },
+          { status: 404 },
+        );
+      }
+
       if (includePast) {
-        // Ver todas las citas (incluyendo pasadas)
-        whereClause = {};
+        // Ver todas las citas del staff (incluyendo pasadas)
+        whereClause = {
+          staffId: staffProfile.id,
+        };
       } else {
-        // Ver solo citas futuras
+        // Ver solo citas futuras del staff
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         whereClause = {
+          staffId: staffProfile.id,
           date: {
             gte: today,
           },
@@ -370,6 +384,32 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Get appointment first to validate ownership
+    const appointmentToUpdate = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+    });
+
+    if (!appointmentToUpdate) {
+      return NextResponse.json(
+        { error: "Appointment not found" },
+        { status: 404 },
+      );
+    }
+
+    // Authorization check for STAFF
+    if (session.user.role === "STAFF") {
+      const staffProfile = await prisma.staff.findUnique({
+        where: { userId: session.user.id },
+      });
+
+      if (!staffProfile || appointmentToUpdate.staffId !== staffProfile.id) {
+        return NextResponse.json(
+          { error: "Forbidden: You can only modify your own appointments" },
+          { status: 403 },
+        );
+      }
+    }
+
     // Update appointment status
     const appointment = await prisma.appointment.update({
       where: { id: appointmentId },
@@ -468,14 +508,23 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Authorization check:
-    // - ADMIN and STAFF can delete any appointment
+    // - ADMIN can delete any appointment
     // - CLIENT can only delete their own appointments
+    // - STAFF cannot delete appointments (can cancel by changing status)
     const userRole = session.user.role as string;
     const userId = session.user.id;
 
+    if (userRole === "STAFF") {
+      return NextResponse.json(
+        {
+          error: "Por favor contacta al administrador para eliminar esta cita",
+        },
+        { status: 403 },
+      );
+    }
+
     if (
       userRole !== "ADMIN" &&
-      userRole !== "STAFF" &&
       (userRole !== "CLIENT" || appointmentToDelete.clientId !== userId)
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

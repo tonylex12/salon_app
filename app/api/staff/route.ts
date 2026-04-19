@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         password: hashedPassword,
         role: "STAFF",
+        emailVerified: new Date(), // Staff creado por admin ya tiene email verificado
       },
     });
 
