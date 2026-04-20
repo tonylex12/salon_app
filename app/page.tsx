@@ -78,7 +78,7 @@ export default function LandingPage() {
               <p className="text-xl text-slate-200 mb-8">
                 Reserva tu cita y vive la mejor experiencia de belleza
               </p>
-              <Link href="/reservar">
+              <Link href="/login">
                 <Button className="bg-white text-slate-900 hover:bg-slate-100 rounded-full py-3 px-8 text-base font-semibold">
                   Reservar Cita
                 </Button>
